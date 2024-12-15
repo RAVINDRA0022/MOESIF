@@ -1,0 +1,86 @@
+`timescale 1ns / 1ps
+
+module MOESIF_PROTOCOL_tb;
+
+    
+    reg clk;
+    reg reset;
+    reg [2:0] state_in;
+    reg request;
+    reg invalidate;
+    reg snoop_hit;
+    reg write;
+    reg forward;
+    wire [2:0] state_out;
+
+    MOESIF_PROTOCOL dut (
+        .clk(clk),
+        .reset(reset),
+        .state_in(state_in),
+        .request(request),
+        .invalidate(invalidate),
+        .snoop_hit(snoop_hit),
+        .write(write),
+        .forward(forward),
+        .state_out(state_out)
+    );
+
+    initial begin
+        clk = 0;
+        forever #5 clk = ~clk; 
+    end
+
+    initial begin
+    
+        reset = 1;
+        state_in = 3'b000; // INVALID state
+        request = 0;
+        invalidate = 0;
+        snoop_hit = 0;
+        write = 0;
+        forward = 0;
+
+        #10 reset = 0; 
+
+        // Test: INVALID -> MODIFIED (write)
+        #10 state_in = 3'b000; write = 1;
+        #10 write = 0;
+
+        // Test: INVALID -> EXCLUSIVE (request)
+        #10 state_in = 3'b000; request = 1;
+        #10 request = 0;
+
+        // Test: SHARED -> MODIFIED (write)
+        #10 state_in = 3'b001; write = 1;
+        #10 write = 0;
+
+        // Test: SHARED -> FORWARD_STATE (forward)
+        #10 state_in = 3'b001; forward = 1;
+        #10 forward = 0;
+
+        // Test: EXCLUSIVE -> OWNED (snoop_hit)
+        #10 state_in = 3'b010; snoop_hit = 1;
+        #10 snoop_hit = 0;
+
+        // Test: MODIFIED -> OWNED (snoop_hit)
+        #10 state_in = 3'b011; snoop_hit = 1;
+        #10 snoop_hit = 0;
+
+        // Test: OWNED -> FORWARD_STATE (forward)
+        #10 state_in = 3'b100; forward = 1;
+        #10 forward = 0;
+
+        // Test: FORWARD_STATE -> SHARED (forward de-asserted)
+        #10 state_in = 3'b101; forward = 0;
+
+        // Complete simulation
+        #50 $finish;
+    end
+
+    // Monitor signals
+    initial begin
+        $monitor($time, " clk=%b reset=%b state_in=%b request=%b invalidate=%b snoop_hit=%b write=%b forward=%b state_out=%b",
+                 clk, reset, state_in, request, invalidate, snoop_hit, write, forward, state_out);
+    end
+
+endmodule
